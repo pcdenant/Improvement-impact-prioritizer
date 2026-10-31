@@ -65,11 +65,21 @@
   .minibar span{position:absolute;left:0;top:0;bottom:0;background:var(--bar);border-radius:5px}
   tr.top td{font-weight:600}
   .minibar.hot span{background:var(--signal)}
-  .gainbar{position:relative;height:18px;background:var(--border);border-radius:4px;min-width:140px}
-  .gainbar .fill{position:absolute;left:0;top:3px;bottom:3px;background:var(--bar);border-radius:3px}
-  .gainbar .range{position:absolute;top:8px;height:2px;background:var(--ink)}
-  .gainbar .target{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--signal)}
-  tr.top3 .gainbar .fill{background:var(--signal)}
+  .gapbar{position:relative;height:14px;background:var(--border);border-radius:4px;min-width:140px}
+  .gapbar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--bar);border-radius:4px}
+  .gapbar .range{position:absolute;top:6px;height:2px;background:var(--ink)}
+  .gapbar.done .fill{background:var(--ok)}
+  tr.top3 .gapbar:not(.done) .fill{background:var(--signal)}
+  .gaplabel{font-size:.8rem;margin-top:3px;white-space:nowrap}
+  .combo .gapbar{background:rgba(249,243,228,.2);margin:8px 0 4px}
+  .combo .gapbar .fill{background:var(--paper)}
+  .combo .gapbar.done .fill{background:#8fd19e}
+  .combo .gapbar .range{background:var(--signal-on-ink)}
+  .kpi .s{font-size:.75rem;color:var(--on-ink-muted);margin-top:4px;font-family:var(--f-mono)}
+  .kpi .s.ko{color:var(--signal-on-ink)}
+  .conv{font-size:.75rem;color:var(--muted);font-family:var(--f-mono)}
+  .conv .warn{font-family:var(--f)}
+  .moves{white-space:nowrap}
   .badge{display:inline-block;font-family:var(--f-mono);font-size:.7rem;font-weight:700;background:var(--signal);color:#fff;border-radius:4px;padding:1px 6px;margin-right:6px}
   .nd{color:var(--muted);font-style:italic}
   .combo{background:var(--ink);color:var(--paper);border-radius:var(--radius-sm);padding:14px;margin-top:14px}
@@ -104,7 +114,7 @@
 
     <h3 class="hint" style="margin-top:16px">Value stream stages — median and P85 time spent in each stage (days).</h3>
     <div class="scroll"><table>
-      <thead><tr><th>Stage</th><th class="num">Median</th><th class="num">P85</th><th>Source</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Stage</th><th class="num">Median</th><th class="num">P85</th><th class="num">Avg WIP (items, optional)</th><th>Source</th><th></th></tr></thead>
       <tbody id="stages"></tbody>
     </table></div>
     <div class="row">
@@ -123,7 +133,8 @@
   <section class="card" aria-labelledby="a-title">
     <div class="step">2 · THE ACTIONS</div>
     <h2 id="a-title">What does each action touch?</h2>
-    <p class="hint">For each stage an action touches (upstream or downstream), estimate the time reduction in that stage: pessimistic / probable / optimistic, and the share of items affected. A negative % means the stage gets longer (e.g. more refinement time upstream).</p>
+    <p class="hint">For each stage an action touches (upstream or downstream), estimate the time reduction in that stage: pessimistic / probable / optimistic, and the share of items affected. A negative % means the stage gets longer (e.g. more refinement time upstream).
+      <br><strong>WIP limit:</strong> if the stage has an average WIP, pick “WIP held” and enter the WIP the team will really hold (pessimistic / probable / optimistic, in items). By Little's law, at constant throughput, time in the stage drops in the same proportion as WIP. If the action also lowers throughput, the gain is overestimated.</p>
     <div id="actions"></div>
     <div class="row">
       <button type="button" id="add-action">+ Action</button>
@@ -139,7 +150,7 @@
   <section class="card" aria-labelledby="r-title">
     <div class="step">3 · THE IMPACT</div>
     <h2 id="r-title">Ranked by P85 gain (probable)</h2>
-    <p class="hint">Bar = days removed from P85 (probable). Thin line = pessimistic → optimistic range. Red line = gain needed to reach the target. Tick actions to see their combined effect.</p>
+    <p class="hint">Bar = share of the gap to the target P85 that the action closes (probable). Full bar = target reached. Thin line = pessimistic → optimistic range. Tick actions to see their combined effect.</p>
     <div id="results"></div>
   </section>
 
@@ -176,6 +187,14 @@ function hash(s) { var h = 2166136261; s = String(s); for (var i = 0; i < s.leng
 function num(v) { var x = typeof v === 'number' ? v : parseFloat(String(v == null ? '' : v).replace(/\s|%|days?|d$/gi, '').replace(',', '.')); return isFinite(x) ? x : NaN; }
 function quantile(sorted, q) { var p = q * (sorted.length - 1), i = Math.floor(p); return i + 1 < sorted.length ? sorted[i] + (sorted[i + 1] - sorted[i]) * (p - i) : sorted[i]; }
 
+// Fraction of stage time removed. 'wip' effects hold the WIP actually reached: by Little's law
+// (time = WIP / throughput, throughput constant) time scales with WIP, and the whole queue benefits.
+function reduction(e, level, stage) {
+  if (e.type === 'wip') { var w = num(stage && stage.wip), t = num(e[level]); return w > 0 && t >= 0 ? 1 - t / w : NaN; }
+  return num(e[level]) / 100;
+}
+function share(e) { return e.type === 'wip' ? 1 : isNaN(num(e.share)) ? 1 : num(e.share) / 100; }
+
 function validStage(s) { return num(s.median) > 0 && num(s.p85) >= num(s.median); }
 
 // Simulated time per stage for N items. Each stage draws from its own seeded stream.
@@ -202,10 +221,12 @@ function totals(stages, sim, actions, level) {
     var r = rng(hash('action:' + a.id)), u = new Float64Array(n);
     for (var i = 0; i < n; i++) u[i] = r();
     (a.effects || []).forEach(function (e) {
-      var k = index[e.stage], red = num(e[level]) / 100, share = isNaN(num(e.share)) ? 1 : num(e.share) / 100;
-      if (k === undefined || isNaN(red)) return;
+      var k = index[e.stage];
+      if (k === undefined) return;
+      var red = reduction(e, level, stages[k]), sh = share(e);
+      if (isNaN(red)) return;
       var f = factor[k];
-      for (var i = 0; i < n; i++) if (u[i] < share) f[i] *= Math.max(0, 1 - red);
+      for (var i = 0; i < n; i++) if (u[i] < sh) f[i] *= Math.max(0, 1 - red);
     });
   });
   var tot = new Float64Array(n);
@@ -214,8 +235,11 @@ function totals(stages, sim, actions, level) {
 }
 function pcts(tot) { var s = Float64Array.from(tot).sort(); return { p50: quantile(s, 0.5), p85: quantile(s, 0.85) }; }
 
-function demonstrable(a) {
-  return (a.effects || []).some(function (e) { return e.stage && num(e.prob) !== 0 && !isNaN(num(e.prob)); });
+function demonstrable(a, stages) {
+  return (a.effects || []).some(function (e) {
+    var st = stages.find(function (s) { return s.id === e.stage; }), r = reduction(e, 'prob', st);
+    return st && r !== 0 && !isNaN(r);
+  });
 }
 
 function evaluate(state, n) {
@@ -236,10 +260,11 @@ function evaluate(state, n) {
     return o;
   }
   var actions = state.actions.map(function (a) {
-    return { action: a, ok: demonstrable(a), proj: demonstrable(a) ? project([a]) : null };
+    var ok = demonstrable(a, stages);
+    return { action: a, ok: ok, proj: ok ? project([a]) : null };
   });
   var ranked = actions.filter(function (x) { return x.ok; }).sort(function (a, b) { return b.proj.prob.gain85 - a.proj.prob.gain85; });
-  var chosen = state.actions.filter(function (a) { return a.selected && demonstrable(a); });
+  var chosen = state.actions.filter(function (a) { return a.selected && demonstrable(a, stages); });
   var combo = chosen.length ? project(chosen) : null;
   var sum = chosen.reduce(function (s, a) { var x = actions.find(function (y) { return y.action === a; }); return s + x.proj.prob.gain85; }, 0);
 
@@ -282,8 +307,8 @@ var uidCount = 0;
 function uid() { return Date.now().toString(36) + (uidCount++).toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
 
 function example() {
-  var s = [['Intake & analysis', 12, 60, 'measured'], ['Waiting for approval', 5, 30, 'measured'], ['Development', 8, 20, 'measured'], ['Code review', 2, 6, 'estimate'], ['QA', 5, 15, 'measured'], ['Waiting for deployment', 4, 20, 'estimate']]
-    .map(function (r, i) { return { id: 'ex' + i, name: r[0], median: r[1], p85: r[2], source: r[3] }; });
+  var s = [['Intake & analysis', 12, 60, 40, 'measured'], ['Waiting for approval', 5, 30, 15, 'measured'], ['Development', 8, 20, 12, 'measured'], ['Code review', 2, 6, '', 'estimate'], ['QA', 5, 15, 8, 'measured'], ['Waiting for deployment', 4, 20, '', 'estimate']]
+    .map(function (r, i) { return { id: 'ex' + i, name: r[0], median: r[1], p85: r[2], wip: r[3], source: r[4] }; });
   function e(k, pess, prob, opt, share) { return { stage: 'ex' + k, pess: pess, prob: prob, opt: opt, share: share }; }
   return {
     example: true,
@@ -294,6 +319,7 @@ function example() {
       { id: 'exa2', name: 'On-demand approval (no weekly board)', selected: true, effects: [e(1, 30, 50, 70, 100)] },
       { id: 'exa3', name: 'Test automation', selected: false, effects: [e(4, 20, 35, 50, 100), e(2, -10, -5, 0, 100)] },
       { id: 'exa4', name: 'Continuous deployment pipeline', selected: false, effects: [e(5, 40, 60, 80, 100)] },
+      { id: 'exa6', name: 'WIP limit of 10 in analysis', selected: false, effects: [{ stage: 'ex0', type: 'wip', pess: 18, prob: 14, opt: 10 }] },
       { id: 'exa5', name: 'Improve team communication', selected: false, effects: [] }
     ]
   };
@@ -311,7 +337,7 @@ function load() {
   try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && s.stages && s.actions && s.real) return s; } catch (e) { }
   return example();
 }
-function touched() { if (state.example) { state.example = false; renderBanner(); } save(); schedule(); }
+function touched() { if (state.example) { state.example = false; renderBanner(); } save(); refreshConv(); schedule(); }
 
 function renderBanner() {
   $('banner').innerHTML = state.example ? '<div class="banner">Fictional example data. Replace it with yours, or <button type="button" id="start-empty">start empty</button></div>' : '';
@@ -321,28 +347,68 @@ function renderInputs() {
   document.querySelectorAll('[data-real]').forEach(function (el) { el.value = isNaN(num(state.real[el.dataset.real])) ? '' : state.real[el.dataset.real]; });
   $('stages').innerHTML = state.stages.map(function (s, i) {
     var warn = num(s.p85) < num(s.median) ? '<div class="warn">P85 must be ≥ median</div>' : '';
-    return '<tr><td><input type="text" aria-label="Stage name" data-s="' + i + '" data-f="name" value="' + esc(s.name) + '"></td>' +
+    return '<tr><td class="moves"><button type="button" class="icon" aria-label="Move stage up" data-up="' + i + '"' + (i ? '' : ' disabled') + '>↑</button><button type="button" class="icon" aria-label="Move stage down" data-down="' + i + '"' + (i < state.stages.length - 1 ? '' : ' disabled') + '>↓</button></td>' +
+      '<td><input type="text" aria-label="Stage name" data-s="' + i + '" data-f="name" value="' + esc(s.name) + '"></td>' +
       '<td><input type="number" step="any" min="0" aria-label="Median days" data-s="' + i + '" data-f="median" value="' + esc(s.median) + '"></td>' +
       '<td><input type="number" step="any" min="0" aria-label="P85 days" data-s="' + i + '" data-f="p85" value="' + esc(s.p85) + '">' + warn + '</td>' +
+      '<td><input type="number" step="any" min="0" aria-label="Average WIP in items" data-s="' + i + '" data-f="wip" value="' + esc(isNaN(num(s.wip)) ? '' : s.wip) + '"></td>' +
       '<td><select aria-label="Data source" data-s="' + i + '" data-f="source"><option value="measured"' + (s.source !== 'estimate' ? ' selected' : '') + '>Measured (Jira)</option><option value="estimate"' + (s.source === 'estimate' ? ' selected' : '') + '>Team estimate</option></select></td>' +
       '<td><button type="button" class="icon" aria-label="Delete stage" data-del-stage="' + i + '">✕</button></td></tr>';
   }).join('');
   var opts = function (sel) { return '<option value="">— stage —</option>' + state.stages.map(function (s) { return '<option value="' + esc(s.id) + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join(''); };
   $('actions').innerHTML = state.actions.map(function (a, i) {
     var rows = a.effects.map(function (e, j) {
-      var bad = !(num(e.pess) <= num(e.prob) && num(e.prob) <= num(e.opt)) ? '<div class="warn">expected pess ≤ probable ≤ optim</div>' : '';
+      var st = state.stages.find(function (s) { return s.id === e.stage; }), hasWip = num(st && st.wip) > 0, wip = e.type === 'wip';
+      var type = '<select aria-label="Effect type" data-a="' + i + '" data-e="' + j + '" data-f="type"><option value="time">% time</option><option value="wip"' + (wip ? ' selected' : '') + (hasWip || wip ? '' : ' disabled') + '>WIP held</option></select>';
       var cell = function (f, label) { return '<td><input type="number" step="any" aria-label="' + label + '" data-a="' + i + '" data-e="' + j + '" data-f="' + f + '" value="' + esc(isNaN(num(e[f])) ? '' : e[f]) + '"></td>'; };
-      return '<tr><td><select aria-label="Stage touched" data-a="' + i + '" data-e="' + j + '" data-f="stage">' + opts(e.stage) + '</select>' + bad + '</td>' +
-        cell('pess', 'Pessimistic reduction %') + cell('prob', 'Probable reduction %') + cell('opt', 'Optimistic reduction %') + cell('share', '% of items affected') +
+      return '<tr><td><select aria-label="Stage touched" data-a="' + i + '" data-e="' + j + '" data-f="stage">' + opts(e.stage) + '</select><div class="conv" id="conv-' + i + '-' + j + '"></div></td><td>' + type + '</td>' +
+        cell('pess', wip ? 'Pessimistic WIP held' : 'Pessimistic reduction %') + cell('prob', wip ? 'Probable WIP held' : 'Probable reduction %') + cell('opt', wip ? 'Optimistic WIP held' : 'Optimistic reduction %') +
+        (wip ? '<td class="num nd">all</td>' : cell('share', '% of items affected')) +
         '<td><button type="button" class="icon" aria-label="Delete effect" data-del-effect="' + i + ':' + j + '">✕</button></td></tr>';
     }).join('');
     return '<div class="action"><div class="action-head"><input type="text" aria-label="Action name" data-a="' + i + '" data-f="name" value="' + esc(a.name) + '" placeholder="Action name">' +
       '<button type="button" class="icon" aria-label="Delete action" data-del-action="' + i + '">✕</button></div>' +
-      (a.effects.length ? '<div class="scroll"><table><thead><tr><th>Stage touched</th><th class="num">Pess %</th><th class="num">Probable %</th><th class="num">Optim %</th><th class="num">% items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '') +
+      (a.effects.length ? '<div class="scroll"><table><thead><tr><th>Stage touched</th><th>Type</th><th class="num">Pess</th><th class="num">Probable</th><th class="num">Optim</th><th class="num">% items</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '') +
       '<div class="row"><button type="button" data-add-effect="' + i + '">+ Stage touched</button></div></div>';
   }).join('') || '<p class="hint">No actions yet.</p>';
+  refreshConv();
+}
+// Per-effect hint updated in place while typing (re-rendering would steal focus).
+function refreshConv() {
+  state.actions.forEach(function (a, i) {
+    a.effects.forEach(function (e, j) {
+      var el = $('conv-' + i + '-' + j); if (!el) return;
+      var st = state.stages.find(function (s) { return s.id === e.stage; }), h = '';
+      if (e.type === 'wip') {
+        var w = num(st && st.wip);
+        if (!(w > 0)) h = '<span class="warn">this stage has no average WIP</span>';
+        else {
+          h = 'WIP ' + d(w) + ' → ' + d(num(e.prob)) + ' ≈ ' + (isNaN(num(e.prob)) ? '–' : g(100 * reduction(e, 'prob', st)) + ' % time');
+          if (!(num(e.pess) >= num(e.prob) && num(e.prob) >= num(e.opt))) h += '<div class="warn">expected WIP pess ≥ probable ≥ optim</div>';
+        }
+      } else if (!(num(e.pess) <= num(e.prob) && num(e.prob) <= num(e.opt))) h = '<span class="warn">expected pess ≤ probable ≤ optim</span>';
+      el.innerHTML = h;
+    });
+  });
 }
 
+// Real (entered) value, with the value computed from the stages underneath so edits to stages are visible.
+var GAP_WARN = 0.25;
+function kpi(label, real, sim, entered, cls) {
+  var diff = sim / real - 1, far = entered && Math.abs(diff) > GAP_WARN;
+  return '<div class="kpi' + cls + '"><div class="v">' + d(real) + ' d</div><div class="l">' + label + (entered ? ' (real)' : ' (from stages)') + '</div>' +
+    (entered ? '<div class="s' + (far ? ' ko' : '') + '">from stages: ' + d(sim) + ' d (' + (diff >= 0 ? '+' : '−') + Math.round(Math.abs(100 * diff)) + ' %)' +
+      (far ? '<br>gap > 25 %: check the stages' : '') + '</div>' : '') + '</div>';
+}
+function gapBar(proj, need, real85) {
+  // % of the gap to target closed; with no target (or already met), % of the P85 removed.
+  var base = need || real85, pct = function (l) { return 100 * proj[l].gain85 / base; };
+  var p = pct('prob'), lo = Math.min(pct('pess'), pct('opt')), hi = Math.max(pct('pess'), pct('opt'));
+  var c = function (v) { return Math.max(0, Math.min(100, v)); }, done = p >= 100;
+  var label = g(proj.prob.gain85) + ' d · ' + (need ? 'closes ' + Math.round(p) + ' % of the ' + d(need) + ' d to remove' : Math.round(p) + ' % of P85') + ' (' + Math.round(lo) + '–' + Math.round(hi) + ' %)';
+  return '<div class="gapbar' + (done ? ' done' : '') + '" role="img" aria-label="' + label + '"><div class="fill" style="width:' + c(p) + '%"></div>' +
+    '<div class="range" style="left:' + c(lo) + '%;width:' + (c(hi) - c(lo)) + '%"></div></div><div class="gaplabel">' + label + '</div>';
+}
 function renderResults() {
   var r = evaluate(state);
   if (!r) { $('problem').innerHTML = '<p class="hint" style="margin-top:12px">Add at least one stage with a median and a P85 to see results.</p>'; $('results').innerHTML = ''; return; }
@@ -351,8 +417,8 @@ function renderResults() {
   var gap = r.target ? r.real.p85 - r.target : null;
   $('problem').innerHTML =
     '<div class="kpis">' +
-    '<div class="kpi"><div class="v">' + d(r.real.p50) + ' d</div><div class="l">Median lead time</div></div>' +
-    '<div class="kpi hot"><div class="v">' + d(r.real.p85) + ' d</div><div class="l">P85 lead time</div></div>' +
+    kpi('Median lead time', r.real.p50, r.base.p50, num(state.real.p50) > 0, '') +
+    kpi('P85 lead time', r.real.p85, r.base.p85, num(state.real.p85) > 0, ' hot') +
     (r.target ? '<div class="kpi"><div class="v">' + d(r.target) + ' d</div><div class="l">Target P85</div></div><div class="kpi hot"><div class="v">' + (gap > 0 ? '−' + d(gap) : '0') + ' d</div><div class="l">Days to remove from P85</div></div>' : '') +
     '</div>' +
     '<div class="scroll"><table><thead><tr><th>Stage</th><th class="num">Typical item</th><th class="num">Tail item (≥P85)</th><th>Share of the tail</th></tr></thead><tbody>' +
@@ -362,33 +428,27 @@ function renderResults() {
         '<td><div class="minibar' + (hot ? ' hot' : '') + '" role="img" aria-label="' + Math.round(100 * c.tail / tailSum) + '% of tail time"><span style="width:' + (100 * c.tail / tailSum) + '%"></span></div></td></tr>';
     }).join('') +
     '<tr><td><strong>Total (simulated)</strong></td><td class="num">' + d(typSum) + ' d</td><td class="num">' + d(tailSum) + ' d</td><td></td></tr></tbody></table></div>' +
-    '<p class="legend">Simulated from stages: median ' + d(r.base.p50) + ' d, P85 ' + d(r.base.p85) + ' d (real: ' + d(r.real.p50) + ' / ' + d(r.real.p85) + ' d). ' +
-    'A lower simulated P85 is expected: the model treats stages as independent, while in reality a stuck item tends to be stuck everywhere. Gains below are applied as a % to the real values.</p>';
+    '<p class="legend">Some gap between real and “from stages” is expected: the model treats stages as independent, while in reality a stuck item tends to be stuck everywhere. Gains below are applied as a % to the real values.</p>';
 
   var need = gap > 0 ? gap : null;
-  var scale = Math.max(need || 0, Math.max.apply(null, [1].concat(r.ranked.map(function (x) { return Math.max(x.proj.opt.gain85, x.proj.pess.gain85); })))) * 1.05;
-  var pos = function (v) { return Math.max(0, Math.min(100, 100 * v / scale)); };
   var rows = r.ranked.map(function (x, i) {
     var p = x.proj, top = i < 3 && p.prob.gain85 > 0;
-    var lo = Math.min(p.pess.gain85, p.opt.gain85), hi = Math.max(p.pess.gain85, p.opt.gain85);
     var idx = state.actions.indexOf(x.action);
     return '<tr' + (top ? ' class="top3"' : '') + '><td><input type="checkbox" aria-label="Include in combination" data-sel="' + idx + '"' + (x.action.selected ? ' checked' : '') + '></td>' +
       '<td>' + (top ? '<span class="badge">#' + (i + 1) + '</span>' : '<span class="nd">#' + (i + 1) + '</span> ') + esc(x.action.name || '(unnamed)') + '</td>' +
       '<td class="num"><strong>' + g(p.prob.gain85) + ' d</strong><div class="nd">' + g(p.pess.gain85) + ' to ' + g(p.opt.gain85) + '</div></td>' +
       '<td class="num">' + d(p.prob.p85) + ' d</td><td class="num">' + d(p.prob.p50) + ' d</td>' +
-      '<td><div class="gainbar" role="img" aria-label="P85 gain ' + d(p.prob.gain85) + ' days, range ' + d(lo) + ' to ' + d(hi) + (need ? ', target needs ' + d(need) : '') + '">' +
-      '<div class="fill" style="width:' + pos(p.prob.gain85) + '%"></div><div class="range" style="left:' + pos(lo) + '%;width:' + (pos(hi) - pos(lo)) + '%"></div>' +
-      (need ? '<div class="target" style="left:' + pos(need) + '%"></div>' : '') + '</div></td></tr>';
+      '<td>' + gapBar(p, need, r.real.p85) + '</td></tr>';
   }).join('');
-  var nd = r.notDemo.length ? '<p class="hint" style="margin-top:12px"><strong>Impact not demonstrable</strong> (no stage or no probable % yet): ' + r.notDemo.map(function (x) { return esc(x.action.name || '(unnamed)'); }).join(', ') + '. Attach them to a stage, or drop them.</p>' : '';
+  var nd = r.notDemo.length ? '<p class="hint" style="margin-top:12px"><strong>Impact not demonstrable</strong> (no stage, no probable value, or a WIP effect on a stage without WIP): ' + r.notDemo.map(function (x) { return esc(x.action.name || '(unnamed)'); }).join(', ') + '. Attach them to a stage, or drop them.</p>' : '';
   var combo = '';
   if (r.combo) {
     var c = r.combo, hit = r.target ? (c.prob.p85 <= r.target ? '<span class="ok">reaches the target</span>' : '<span class="ko">' + d(c.prob.p85 - r.target) + ' d above the target</span>') : '';
     var safe = r.target && c.pess.p85 <= r.target ? ' Even the pessimistic case reaches it.' : '';
-    combo = '<div class="combo">Combined (' + r.comboCount + ' action' + (r.comboCount > 1 ? 's' : '') + '): P85 <strong>' + d(r.real.p85) + ' → ' + d(c.prob.p85) + ' d</strong> (range ' + d(c.opt.p85) + '–' + d(c.pess.p85) + ' d), median ' + d(r.real.p50) + ' → ' + d(c.prob.p50) + ' d. ' + hit + '.' + safe +
+    combo = '<div class="combo">Combined (' + r.comboCount + ' action' + (r.comboCount > 1 ? 's' : '') + '): P85 <strong>' + d(r.real.p85) + ' → ' + d(c.prob.p85) + ' d</strong> (range ' + d(c.opt.p85) + '–' + d(c.pess.p85) + ' d), median ' + d(r.real.p50) + ' → ' + d(c.prob.p50) + ' d. ' + hit + '.' + safe + gapBar(c, need, r.real.p85) +
       (r.comboCount > 1 ? '<br><span style="color:var(--on-ink-muted)">Combined gain ' + g(c.prob.gain85) + ' d vs ' + g(r.comboSum) + ' d if you add the individual gains: ' + (c.prob.gain85 < r.comboSum ? 'the actions overlap, so the whole is less than the sum.' : 'no overlap, the actions shorten different parts of the tail.') + '</span>' : '') + '</div>';
   }
-  $('results').innerHTML = (rows ? '<div class="scroll"><table><thead><tr><th>Combine</th><th>Action</th><th class="num">P85 gain</th><th class="num">New P85</th><th class="num">New median</th><th>Gain vs target</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="hint">No action with a demonstrable impact yet.</p>') + combo + nd;
+  $('results').innerHTML = (rows ? '<div class="scroll"><table><thead><tr><th>Combine</th><th>Action</th><th class="num">P85 gain</th><th class="num">New P85</th><th class="num">New median</th><th>' + (need ? 'Gap to target closed' : 'P85 reduction') + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="hint">No action with a demonstrable impact yet.</p>') + combo + nd;
 }
 var timer;
 function schedule() { clearTimeout(timer); timer = setTimeout(renderResults, 150); }
@@ -408,19 +468,26 @@ function init() {
     else return;
     touched(); // stage rename refreshes the stage pickers on 'change' below, to keep focus while typing
   });
-  document.addEventListener('change', function (ev) { if (ev.target.dataset.f === 'name' && ev.target.dataset.s !== undefined) renderInputs(); });
+  document.addEventListener('change', function (ev) {
+    var ds = ev.target.dataset;
+    if ((ds.f === 'name' && ds.s !== undefined) || ds.f === 'type' || ds.f === 'stage' || (ds.f === 'wip' && ds.s !== undefined)) renderInputs();
+  });
   document.addEventListener('click', function (ev) {
     var ds = ev.target.dataset; if (!ds) return;
     if (ds.toggle) { $(ds.toggle).classList.toggle('open'); return; }
     if (ds.delStage !== undefined) { var id = state.stages[+ds.delStage].id; state.stages.splice(+ds.delStage, 1); state.actions.forEach(function (a) { a.effects = a.effects.filter(function (e) { return e.stage !== id; }); }); }
+    else if (ds.up !== undefined || ds.down !== undefined) {
+      var from = +(ds.up !== undefined ? ds.up : ds.down), to = from + (ds.up !== undefined ? -1 : 1);
+      state.stages.splice(to, 0, state.stages.splice(from, 1)[0]);
+    }
     else if (ds.delAction !== undefined) state.actions.splice(+ds.delAction, 1);
     else if (ds.delEffect !== undefined) { var p = ds.delEffect.split(':'); state.actions[+p[0]].effects.splice(+p[1], 1); }
-    else if (ds.addEffect !== undefined) state.actions[+ds.addEffect].effects.push({ stage: '', pess: '', prob: '', opt: '', share: 100 });
+    else if (ds.addEffect !== undefined) state.actions[+ds.addEffect].effects.push({ stage: '', type: 'time', pess: '', prob: '', opt: '', share: 100 });
     else return;
     renderInputs(); touched();
   });
-  $('add-stage').onclick = function () { state.stages.push({ id: uid(), name: '', median: '', p85: '', source: 'measured' }); renderInputs(); touched(); };
-  $('add-action').onclick = function () { state.actions.push({ id: uid(), name: '', selected: false, effects: [{ stage: '', pess: '', prob: '', opt: '', share: 100 }] }); renderInputs(); touched(); };
+  $('add-stage').onclick = function () { state.stages.push({ id: uid(), name: '', median: '', p85: '', wip: '', source: 'measured' }); renderInputs(); touched(); };
+  $('add-action').onclick = function () { state.actions.push({ id: uid(), name: '', selected: false, effects: [{ stage: '', type: 'time', pess: '', prob: '', opt: '', share: 100 }] }); renderInputs(); touched(); };
   $('apply-stages').onclick = function () {
     var s = parseStages(document.querySelector('#paste-stages textarea').value);
     if (!s.length) { $('paste-stages-msg').textContent = 'No valid line found. Expected: Stage ⇥ Median ⇥ P85.'; return; }

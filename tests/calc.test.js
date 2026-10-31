@@ -99,3 +99,21 @@ test('example data evaluates without errors', () => {
   assert.equal(r.notDemo.length, 1);
   assert.ok(r.combo && r.combo.prob.p85 < r.real.p85);
 });
+
+test('WIP held: 40 -> 20 items halves stage time for all items (Little\'s law)', () => {
+  const s = one(10, 40);
+  s.stages[0].wip = 40;
+  s.real = { p50: 50, p85: 200 };
+  s.actions = [{ id: 'w', effects: [{ stage: 'a', type: 'wip', pess: 30, prob: 20, opt: 10, share: 5 }] }];
+  const p = ctx.evaluate(s).ranked[0].proj;
+  near(p.prob.p85, 100, 1e-6, 'share ignored, -50% time');
+  assert.ok(p.pess.gain85 < p.prob.gain85 && p.prob.gain85 < p.opt.gain85, 'lower WIP held = bigger gain');
+});
+
+test('WIP effect on a stage without WIP is not demonstrable', () => {
+  const s = one(10, 40);
+  s.actions = [{ id: 'w', effects: [{ stage: 'a', type: 'wip', pess: 30, prob: 20, opt: 10 }] }];
+  const r = ctx.evaluate(s);
+  assert.equal(r.ranked.length, 0);
+  assert.equal(r.notDemo.length, 1);
+});
