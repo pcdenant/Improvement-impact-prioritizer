@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Future-State VSM Calculator</title>
+<meta name="description" content="Put your kaizen bursts on the value stream map and see which one cuts lead time and P85 the most.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  /* Collaboration Solved design system (ink / paper / signal), same tokens as
+     impediment-value-calculator and Continuous-Improvement-Calculator. */
+  :root{
+    --ink:#15110d; --paper:#f9f3e4; --paper-strong:#f0e5cb;
+    --signal:#c8102e; --signal-on-ink:#e63946; --ok:#1e6b3a;
+    --text:#1a1a1a; --muted:#666; --on-ink-muted:rgba(255,255,255,.8);
+    --border:#e8ddd1; --track:#8c8073; --bar:#5b5048;
+    --radius:20px; --radius-sm:10px; --gap:12px;
+    --f:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+    --f-heading:'Archivo',-apple-system,BlinkMacSystemFont,sans-serif;
+    --f-mono:'IBM Plex Mono',Menlo,Consolas,monospace;
+  }
+  body{background:var(--ink);padding:16px;font-family:var(--f);color:var(--text);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:var(--gap)}
+  header{text-align:center;padding:24px 0 8px;color:var(--paper)}
+  .eyebrow{font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--signal-on-ink)}
+  h1{font-family:var(--f-heading);font-size:clamp(1.6rem,4vw,2.3rem);line-height:1.15;margin:8px 0}
+  header p{color:var(--on-ink-muted);max-width:640px;margin:0 auto}
+  .card{background:var(--paper);border-radius:var(--radius);padding:20px}
+  h2{font-family:var(--f-heading);font-size:1.25rem;margin-bottom:4px}
+  .step{font-family:var(--f-mono);font-size:.75rem;color:var(--signal);font-weight:700;letter-spacing:.06em}
+  .hint{color:var(--muted);font-size:.875rem;margin-bottom:12px}
+  .scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:.875rem}
+  th{text-align:left;font-weight:600;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;padding:6px 6px;border-bottom:1px solid var(--border)}
+  td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+  td.num,th.num{text-align:right;font-family:var(--f-mono)}
+  input,select,textarea{font:inherit;color:var(--text);background:#fff;border:1px solid var(--border);border-radius:6px;padding:6px 8px;width:100%}
+  input[type=number]{font-family:var(--f-mono);text-align:right;min-width:70px}
+  input[type=checkbox]{width:18px;height:18px;accent-color:var(--signal)}
+  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+  textarea{font-family:var(--f-mono);font-size:.8rem;min-height:110px}
+  button{font:inherit;font-weight:600;font-size:.875rem;border:1px solid var(--ink);background:var(--paper);color:var(--ink);border-radius:var(--radius-sm);padding:7px 12px;cursor:pointer}
+  button.primary{background:var(--ink);color:var(--paper)}
+  button.icon{border:none;background:none;color:var(--muted);padding:4px 8px;font-size:1rem}
+  button.icon:hover{color:var(--signal)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .grid3 label{font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;flex-direction:column;gap:4px}
+  .warn{color:var(--signal);font-size:.8rem}
+  .paste{display:none;margin-top:10px}
+  .paste.open{display:block}
+  .action{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:#fffdf7}
+  .action-head{display:flex;gap:8px;align-items:center}
+  .action-head input[type=text]{font-weight:600}
+  .banner{background:var(--paper-strong);border-radius:var(--radius-sm);padding:8px 12px;font-size:.85rem;margin-bottom:12px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+  .kpi{background:var(--ink);color:var(--paper);border-radius:var(--radius-sm);padding:12px}
+  .kpi .v{font-family:var(--f-mono);font-size:1.5rem;font-weight:700}
+  .kpi .l{font-size:.75rem;color:var(--on-ink-muted)}
+  .kpi.hot .v{color:var(--signal-on-ink)}
+  .minibar{height:10px;background:var(--border);border-radius:5px;position:relative;min-width:80px}
+  .minibar span{position:absolute;left:0;top:0;bottom:0;background:var(--bar);border-radius:5px}
+  tr.top td{font-weight:600}
+  .minibar.hot span{background:var(--signal)}
+  .gapbar{position:relative;height:14px;background:var(--border);border-radius:4px;min-width:140px}
+  .gapbar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--bar);border-radius:4px}
+  .gapbar .range{position:absolute;top:6px;height:2px;background:var(--ink)}
+  .gapbar.done .fill{background:var(--ok)}
+  tr.top3 .gapbar:not(.done) .fill{background:var(--signal)}
+  .gaplabel{font-size:.8rem;margin-top:3px;white-space:nowrap}
+  .combo .gapbar{background:rgba(249,243,228,.2);margin:8px 0 4px}
+  .combo .gapbar .fill{background:var(--paper)}
+  .combo .gapbar.done .fill{background:#8fd19e}
+  .combo .gapbar .range{background:var(--signal-on-ink)}
+  .kpi .s{font-size:.75rem;color:var(--on-ink-muted);margin-top:4px;font-family:var(--f-mono)}
+  .kpi .s.ko{color:var(--signal-on-ink)}
+  .conv{font-size:.75rem;color:var(--muted);font-family:var(--f-mono)}
+  .conv .warn{font-family:var(--f)}
+  .moves{white-space:nowrap}
+  .badge{display:inline-block;font-family:var(--f-mono);font-size:.7rem;font-weight:700;background:var(--signal);color:#fff;border-radius:4px;padding:1px 6px;margin-right:6px}
+  .nd{color:var(--muted);font-style:italic}
+  .combo{background:var(--ink);color:var(--paper);border-radius:var(--radius-sm);padding:14px;margin-top:14px}
+  .combo strong{font-family:var(--f-mono)}
+  .combo .ok{color:#8fd19e}
+  .combo .ko{color:var(--signal-on-ink)}
+  .legend{font-size:.8rem;color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:10px;height:10px;vertical-align:middle;margin:0 4px 0 10px;border-radius:2px}
+  footer{color:var(--on-ink-muted);font-size:.8rem;text-align:center;padding:8px 0 24px}
+  footer a{color:var(--paper)}
+  @media (max-width:640px){.grid3{grid-template-columns:1fr}}
+  .ladder{display:flex;height:16px;border-radius:4px;overflow:hidden;background:var(--border);min-width:160px}
+  .ladder .w{background:var(--signal)}
+  .ladder .p{background:var(--ink)}
+  .computed{color:var(--muted);font-family:var(--f-mono);font-size:.8rem;text-align:right;padding-right:8px}
+  header a{color:var(--paper)}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .grid4 label{font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;flex-direction:column;gap:4px}
+  @media (max-width:640px){.grid4{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Collaboration Solved · Flow toolkit</div>
+    <h1>Future-State VSM Calculator</h1>
+    <p>Map the current state, place your kaizen bursts on it, and see which one cuts the lead time and the P85 the most. Other version: <a href="index.html">distribution-based prioritizer</a>.</p>
+  </header>
+
+  <section class="card" aria-labelledby="p-title">
+    <div class="step">1 · CURRENT STATE</div>
+    <h2 id="p-title">Your value stream today</h2>
+    <div id="banner"></div>
+    <div class="grid4">
+      <label>Throughput (items / week)<input type="number" step="any" min="0" data-top="throughput"></label>
+      <label>Real median lead time (days)<input type="number" step="any" min="0" data-real="p50"></label>
+      <label>Real P85 lead time (days)<input type="number" step="any" min="0" data-real="p85"></label>
+      <label>Target P85 (days)<input type="number" step="any" min="0" data-real="target"></label>
+    </div>
+    <h3 class="hint" style="margin-top:16px">Steps. All times are in calendar days, like your lead time. Process time = calendar days of real work on one item. Inventory = items waiting in or before the step. Wait = inventory ÷ throughput (Little's law); enter the wait directly only if you have no inventory count.</h3>
+    <div class="scroll"><table>
+      <thead><tr><th></th><th>Step</th><th class="num">Process time (calendar d)</th><th class="num">Inventory (items)</th><th class="num">Wait (d)</th><th></th></tr></thead>
+      <tbody id="steps"></tbody>
+    </table></div>
+    <div class="row">
+      <button type="button" id="add-step">+ Step</button>
+      <button type="button" data-toggle="paste-steps">Paste from Excel / Confluence</button>
+    </div>
+    <div class="paste" id="paste-steps">
+      <p class="hint">One step per line: <code>Step ⇥ Process time ⇥ Inventory ⇥ Wait (optional)</code>. Replaces the current steps.</p>
+      <textarea aria-label="Paste steps"></textarea>
+      <div class="row"><button type="button" class="primary" id="apply-steps">Replace steps</button><span class="warn" id="paste-steps-msg"></span></div>
+    </div>
+    <div id="current"></div>
+  </section>
+
+  <section class="card" aria-labelledby="a-title">
+    <div class="step">2 · KAIZEN BURSTS</div>
+    <h2 id="a-title">What does each action change on the map?</h2>
+    <p class="hint">Write the future-state number for each box an action changes, pessimistic / probable / optimistic. Example: inventory in Analysis 40 → 18 / 14 / 10. “Throughput” changes every wait at once. Set process time and inventory to 0 to remove a step.</p>
+    <div id="bursts"></div>
+    <div class="row"><button type="button" id="add-burst">+ Kaizen burst</button></div>
+  </section>
+
+  <section class="card" aria-labelledby="r-title">
+    <div class="step">3 · FUTURE STATE</div>
+    <h2 id="r-title">Ranked by P85 gain (probable)</h2>
+    <p class="hint">Bar = share of the gap to the target P85 that the burst closes. Full bar = target reached. Thin line = pessimistic → optimistic range. Tick bursts to build the future-state map.</p>
+    <div id="results"></div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="margin-top:0">
+      <button type="button" id="export">Export JSON</button>
+      <button type="button" id="import">Import JSON</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden>
+      <button type="button" id="example">Load example</button>
+      <button type="button" id="clear">Clear all</button>
+    </div>
+    <p class="hint" style="margin:10px 0 0">Your data stays in this browser (saved automatically). Nothing is sent anywhere.</p>
+  </section>
+
+  <footer>How it works: classic future-state VSM. Lead time = Σ process time + Σ wait, with wait = inventory ÷ throughput (Little's law). Flow efficiency = process time ÷ lead time. The P85 and median are projected by scaling the real values with the lead-time ratio (future ÷ current): this assumes the tail shrinks in proportion. If your tail is driven by blocked items, the P85 gain is optimistic. · <a href="https://collaborationsolved.com">Collaboration Solved</a></footer>
+</div>
+
+<script>
+'use strict';
+// ---------- Model (pure, tested in tests/vsm.test.js) ----------
+var LEVELS = ['pess', 'prob', 'opt'];
+function num(v) { var x = typeof v === 'number' ? v : parseFloat(String(v == null ? '' : v).replace(/\s|%|days?|d$/gi, '').replace(',', '.')); return isFinite(x) ? x : NaN; }
+function perDay(state) { return num(state.throughput) / 7; } // lead times are in calendar days
+
+// Wait of a step: Little's law when inventory and throughput are known, else the wait entered.
+function waitOf(step, tpd) {
+  var inv = num(step.inv);
+  if (inv >= 0 && !isNaN(inv) && tpd > 0) return inv / tpd;
+  return num(step.wait) > 0 ? num(step.wait) : 0;
+}
+function usesInventory(step, tpd) { return num(step.inv) >= 0 && !isNaN(num(step.inv)) && tpd > 0; }
+
+// Current value of the box a change targets, so the change becomes a ratio (new / current).
+function current(state, c) {
+  if (c.field === 'tp') return num(state.throughput);
+  var s = state.steps.find(function (x) { return x.id === c.step; });
+  if (!s) return NaN;
+  if (c.field === 'pt') return num(s.pt);
+  if (c.field === 'inv') return usesInventory(s, perDay(state)) ? num(s.inv) : NaN;
+  return waitOf(s, perDay(state));
+}
+function ratio(state, c, level) {
+  var cur = current(state, c), v = num(c[level]);
+  return cur > 0 && v >= 0 ? v / cur : NaN;
+}
+
+// Value stream after applying bursts at a level. Ratios multiply, so two bursts on the same box overlap.
+function stream(state, bursts, level) {
+  var f = {}, tp = 1;
+  (bursts || []).forEach(function (b) {
+    (b.changes || []).forEach(function (c) {
+      var r = ratio(state, c, level);
+      if (isNaN(r)) return;
+      if (c.field === 'tp') { tp *= r; return; }
+      var k = c.step + ':' + (c.field === 'pt' ? 'pt' : 'wt');
+      f[k] = (f[k] === undefined ? 1 : f[k]) * r;
+    });
+  });
+  var tpd = perDay(state);
+  var steps = state.steps.map(function (s) {
+    var pt = (num(s.pt) > 0 ? num(s.pt) : 0) * (f[s.id + ':pt'] === undefined ? 1 : f[s.id + ':pt']);
+    var wt = waitOf(s, tpd) * (f[s.id + ':wt'] === undefined ? 1 : f[s.id + ':wt']) / (tp > 0 ? tp : 1);
+    return { step: s, pt: pt, wt: wt };
+  });
+  var pt = steps.reduce(function (a, x) { return a + x.pt; }, 0), wt = steps.reduce(function (a, x) { return a + x.wt; }, 0);
+  return { steps: steps, pt: pt, wt: wt, lt: pt + wt, fe: pt + wt > 0 ? pt / (pt + wt) : 0 };
+}
+
+function demonstrable(state, b) {
+  return (b.changes || []).some(function (c) { var r = ratio(state, c, 'prob'); return !isNaN(r) && r !== 1; });
+}
+
+function evaluate(state) {
+  var now = stream(state, [], 'prob');
+  if (!(now.lt > 0)) return null;
+  var real = { p50: num(state.real.p50) > 0 ? num(state.real.p50) : NaN, p85: num(state.real.p85) > 0 ? num(state.real.p85) : NaN };
+  var target = num(state.real.target) > 0 ? num(state.real.target) : null;
+  function project(bs) {
+    var o = {};
+    LEVELS.forEach(function (l) {
+      var s = stream(state, bs, l), k = s.lt / now.lt;
+      o[l] = { lt: s.lt, fe: s.fe, p50: real.p50 * k, p85: real.p85 * k, stream: s };
+      o[l].gain85 = isNaN(real.p85) ? now.lt - s.lt : real.p85 - o[l].p85;
+    });
+    return o;
+  }
+  var all = state.bursts.map(function (b) { var ok = demonstrable(state, b); return { burst: b, ok: ok, proj: ok ? project([b]) : null }; });
+  var ranked = all.filter(function (x) { return x.ok; }).sort(function (a, b) { return b.proj.prob.gain85 - a.proj.prob.gain85; });
+  var chosen = state.bursts.filter(function (b) { return b.selected && demonstrable(state, b); });
+  var sum = chosen.reduce(function (s, b) { return s + all.find(function (x) { return x.burst === b; }).proj.prob.gain85; }, 0);
+  return { now: now, real: real, target: target, ranked: ranked, notDemo: all.filter(function (x) { return !x.ok; }), combo: chosen.length ? project(chosen) : null, comboSum: sum, comboCount: chosen.length };
+}
+
+function parseRows(text) {
+  return String(text || '').split(/\r?\n/).map(function (l) { return l.trim() ? l.split(l.indexOf('\t') >= 0 ? '\t' : ';').map(function (c) { return c.trim(); }) : null; }).filter(Boolean);
+}
+function parseSteps(text) {
+  return parseRows(text).filter(function (r) { return r[0] && !isNaN(num(r[1])); }).map(function (r) {
+    return { id: uid(), name: r[0], pt: num(r[1]), inv: isNaN(num(r[2])) ? '' : num(r[2]), wait: isNaN(num(r[3])) ? '' : num(r[3]) };
+  });
+}
+var uidCount = 0;
+function uid() { return Date.now().toString(36) + (uidCount++).toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
+
+function example() {
+  var st = [['Intake & analysis', 4, 25], ['Waiting for approval', 0.5, 10], ['Development', 6, 12], ['Code review', 0.5, 3], ['QA', 2, 6], ['Deployment', 0.5, 6]]
+    .map(function (r, i) { return { id: 'ex' + i, name: r[0], pt: r[1], inv: r[2], wait: '' }; });
+  function c(step, field, pess, prob, opt) { return { step: step, field: field, pess: pess, prob: prob, opt: opt }; }
+  return {
+    example: true, throughput: 7,
+    real: { p50: 45, p85: 170, target: 90 },
+    steps: st,
+    bursts: [
+      { id: 'b1', name: 'WIP limit of 10 in analysis', selected: true, changes: [c('ex0', 'inv', 12, 9, 6)] },
+      { id: 'b2', name: 'On-demand approval (no weekly board)', selected: true, changes: [c('ex1', 'inv', 6, 4, 2)] },
+      { id: 'b3', name: 'Definition of Ready before analysis', selected: false, changes: [c('ex0', 'pt', 3.5, 3, 2.5), c('ex4', 'pt', 2, 1.5, 1)] },
+      { id: 'b4', name: 'Continuous deployment pipeline', selected: false, changes: [c('ex5', 'inv', 4, 2, 1), c('ex5', 'pt', 0.5, 0.2, 0.1)] },
+      { id: 'b5', name: 'Improve team communication', selected: false, changes: [] }
+    ]
+  };
+}
+
+// ---------- UI ----------
+var KEY = 'future-state-vsm:v1';
+var state;
+var FIELDS = { pt: 'Process time (d)', inv: 'Inventory (items)', wait: 'Wait (d)', tp: 'Throughput (items/week)' };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function d(x) { return isFinite(x) ? (Math.abs(x) >= 10 ? Math.round(x) : Math.round(x * 10) / 10) : '–'; }
+function g(x) { return x >= 0 ? '−' + d(x) : '+' + d(-x); }
+function pc(x) { return isFinite(x) ? Math.round(100 * x) + ' %' : '–'; }
+function $(id) { return document.getElementById(id); }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private mode: works, not saved */ } }
+function load() {
+  try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && s.steps && s.bursts && s.real) return s; } catch (e) { }
+  return example();
+}
+function touched() { if (state.example) { state.example = false; renderBanner(); } save(); refreshHints(); schedule(); }
+function val(v) { return isNaN(num(v)) ? '' : v; }
+
+function renderBanner() {
+  $('banner').innerHTML = state.example ? '<div class="banner">Fictional example data. Replace it with yours, or <button type="button" id="start-empty">start empty</button></div>' : '';
+  if (state.example) $('start-empty').onclick = clearAll;
+}
+function renderInputs() {
+  document.querySelectorAll('[data-real]').forEach(function (el) { el.value = val(state.real[el.dataset.real]); });
+  document.querySelector('[data-top="throughput"]').value = val(state.throughput);
+  $('steps').innerHTML = state.steps.map(function (s, i) {
+    var n = function (f, label) { return '<td><input type="number" step="any" min="0" aria-label="' + label + '" data-s="' + i + '" data-f="' + f + '" value="' + esc(val(s[f])) + '"></td>'; };
+    return '<tr><td class="moves"><button type="button" class="icon" aria-label="Move step up" data-up="' + i + '"' + (i ? '' : ' disabled') + '>↑</button><button type="button" class="icon" aria-label="Move step down" data-down="' + i + '"' + (i < state.steps.length - 1 ? '' : ' disabled') + '>↓</button></td>' +
+      '<td><input type="text" aria-label="Step name" data-s="' + i + '" data-f="name" value="' + esc(s.name) + '"></td>' +
+      n('pt', 'Process time days') + n('inv', 'Inventory items') +
+      '<td id="wait-' + i + '"></td>' +
+      '<td><button type="button" class="icon" aria-label="Delete step" data-del-step="' + i + '">✕</button></td></tr>';
+  }).join('');
+  var opts = function (c) {
+    return '<option value="">— box —</option>' + state.steps.map(function (s) {
+      return ['pt', 'inv', 'wait'].map(function (f) { var v = s.id + '|' + f; return '<option value="' + esc(v) + '"' + (c.step === s.id && c.field === f ? ' selected' : '') + '>' + esc(s.name) + ' · ' + FIELDS[f] + '</option>'; }).join('');
+    }).join('') + '<option value="|tp"' + (c.field === 'tp' ? ' selected' : '') + '>Whole stream · ' + FIELDS.tp + '</option>';
+  };
+  $('bursts').innerHTML = state.bursts.map(function (b, i) {
+    var rows = b.changes.map(function (c, j) {
+      var cell = function (f, label) { return '<td><input type="number" step="any" min="0" aria-label="' + label + '" data-b="' + i + '" data-c="' + j + '" data-f="' + f + '" value="' + esc(val(c[f])) + '"></td>'; };
+      return '<tr><td><select aria-label="Box changed" data-b="' + i + '" data-c="' + j + '" data-f="box">' + opts(c) + '</select></td>' +
+        '<td class="num" id="cur-' + i + '-' + j + '"></td>' + cell('pess', 'Pessimistic future value') + cell('prob', 'Probable future value') + cell('opt', 'Optimistic future value') +
+        '<td><button type="button" class="icon" aria-label="Delete change" data-del-change="' + i + ':' + j + '">✕</button></td></tr>' +
+        '<tr><td colspan="6" class="conv" id="hint-' + i + '-' + j + '" style="border-top:none;padding-top:0"></td></tr>';
+    }).join('');
+    return '<div class="action"><div class="action-head"><input type="text" aria-label="Kaizen burst name" data-b="' + i + '" data-f="name" value="' + esc(b.name) + '" placeholder="Kaizen burst">' +
+      '<button type="button" class="icon" aria-label="Delete kaizen burst" data-del-burst="' + i + '">✕</button></div>' +
+      (b.changes.length ? '<div class="scroll"><table><thead><tr><th>Box on the map</th><th class="num">Today</th><th class="num">Pess</th><th class="num">Probable</th><th class="num">Optim</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '') +
+      '<div class="row"><button type="button" data-add-change="' + i + '">+ Box changed</button></div></div>';
+  }).join('') || '<p class="hint">No kaizen bursts yet.</p>';
+  refreshHints();
+}
+// Computed cells updated in place while typing (re-rendering would steal focus).
+function refreshHints() {
+  var tpd = perDay(state);
+  state.steps.forEach(function (s, i) {
+    var el = $('wait-' + i); if (!el) return;
+    if (!usesInventory(s, tpd) && el.querySelector('input')) return; // keep focus while typing a wait
+    el.innerHTML = usesInventory(s, tpd) ? '<div class="computed" title="inventory ÷ throughput">' + d(waitOf(s, tpd)) + ' d</div>'
+      : '<input type="number" step="any" min="0" aria-label="Wait days" data-s="' + i + '" data-f="wait" value="' + esc(val(s.wait)) + '">';
+  });
+  state.bursts.forEach(function (b, i) {
+    b.changes.forEach(function (c, j) {
+      var cur = $('cur-' + i + '-' + j), hint = $('hint-' + i + '-' + j); if (!cur) return;
+      var now = current(state, c), r = ratio(state, c, 'prob'), h = '';
+      cur.textContent = c.field ? d(now) : '';
+      if (c.field && !(now > 0)) h = '<span class="warn">' + (c.field === 'inv' ? 'this step has no inventory count (or no throughput)' : 'today\'s value is 0 or empty') + '</span>';
+      else if (!isNaN(r)) {
+        var ch = 100 * (r - 1);
+        h = d(now) + ' → ' + d(num(c.prob)) + ' (' + (ch >= 0 ? '+' : '−') + Math.round(Math.abs(ch)) + ' %)';
+        if (c.field === 'inv') h += ' ≈ same % on the wait of this step (Little\'s law)';
+        if (c.field === 'tp') h += ' ≈ every wait divided by ' + d(r);
+        var up = c.field === 'tp', ordered = up ? num(c.pess) <= num(c.prob) && num(c.prob) <= num(c.opt) : num(c.pess) >= num(c.prob) && num(c.prob) >= num(c.opt);
+        if (!ordered) h += '<div class="warn">expected ' + (up ? 'pess ≤ probable ≤ optim (higher is better)' : 'pess ≥ probable ≥ optim (lower is better)') + '</div>';
+      }
+      hint.innerHTML = h;
+    });
+  });
+}
+
+function gapBar(proj, need, base85) {
+  var base = need || base85, pct = function (l) { return 100 * proj[l].gain85 / base; };
+  var p = pct('prob'), lo = Math.min(pct('pess'), pct('opt')), hi = Math.max(pct('pess'), pct('opt'));
+  var c = function (v) { return Math.max(0, Math.min(100, v)); };
+  var label = g(proj.prob.gain85) + ' d · ' + (need ? 'closes ' + Math.round(p) + ' % of the ' + d(need) + ' d to remove' : Math.round(p) + ' % of P85') + ' (' + Math.round(lo) + '–' + Math.round(hi) + ' %)';
+  return '<div class="gapbar' + (p >= 100 ? ' done' : '') + '" role="img" aria-label="' + label + '"><div class="fill" style="width:' + c(p) + '%"></div>' +
+    '<div class="range" style="left:' + c(lo) + '%;width:' + (c(hi) - c(lo)) + '%"></div></div><div class="gaplabel">' + label + '</div>';
+}
+function ladder(s, scale) {
+  return '<div class="ladder" role="img" aria-label="' + d(s.pt) + ' days process, ' + d(s.wt) + ' days wait"><div class="p" style="width:' + (100 * s.pt / scale) + '%"></div><div class="w" style="width:' + (100 * s.wt / scale) + '%"></div></div>';
+}
+function renderResults() {
+  var r = evaluate(state);
+  if (!r) { $('current').innerHTML = '<p class="hint" style="margin-top:12px">Add a throughput and at least one step to see the map.</p>'; $('results').innerHTML = ''; return; }
+  var n = r.now, scale = Math.max.apply(null, n.steps.map(function (s) { return s.pt + s.wt; }).concat([1e-9]));
+  var hasP85 = !isNaN(r.real.p85), gap = r.target && hasP85 ? r.real.p85 - r.target : null;
+  var worst = Math.max.apply(null, n.steps.map(function (s) { return s.wt; }));
+  $('current').innerHTML =
+    '<div class="kpis">' +
+    '<div class="kpi"><div class="v">' + d(n.lt) + ' d</div><div class="l">VSM lead time (average)</div><div class="s">' + d(n.pt) + ' d process · ' + d(n.wt) + ' d wait</div></div>' +
+    '<div class="kpi hot"><div class="v">' + pc(n.fe) + '</div><div class="l">Flow efficiency</div></div>' +
+    (hasP85 ? '<div class="kpi hot"><div class="v">' + d(r.real.p85) + ' d</div><div class="l">P85 lead time (real)</div>' + (isNaN(r.real.p50) ? '' : '<div class="s">median ' + d(r.real.p50) + ' d</div>') + '</div>' : '') +
+    (gap !== null ? '<div class="kpi"><div class="v">' + d(r.target) + ' d</div><div class="l">Target P85</div><div class="s">' + (gap > 0 ? '−' + d(gap) + ' d to remove' : 'already met') + '</div></div>' : '') +
+    '</div>' +
+    '<div class="scroll"><table><thead><tr><th>Step</th><th class="num">Process</th><th class="num">Wait</th><th>Timeline (black = work, red = wait)</th></tr></thead><tbody>' +
+    n.steps.map(function (s) {
+      return '<tr' + (s.wt === worst && worst > 0 ? ' class="top"' : '') + '><td>' + esc(s.step.name) + '</td><td class="num">' + d(s.pt) + ' d</td><td class="num">' + d(s.wt) + ' d</td><td>' + ladder(s, scale) + '</td></tr>';
+    }).join('') + '</tbody></table></div>' +
+    (hasP85 ? '<p class="legend">The VSM lead time is an average. Your P85 is ' + d(r.real.p85 / n.lt) + '× the VSM lead time: that ratio is the tail. Gains below are applied in proportion to the real P85.</p>' : '<p class="legend">Enter your real P85 to project gains on it; until then gains are on the VSM lead time.</p>');
+
+  var need = gap > 0 ? gap : null, base85 = hasP85 ? r.real.p85 : n.lt;
+  var rows = r.ranked.map(function (x, i) {
+    var p = x.proj, top = i < 3 && p.prob.gain85 > 0, idx = state.bursts.indexOf(x.burst);
+    return '<tr' + (top ? ' class="top3"' : '') + '><td><input type="checkbox" aria-label="Include in future state" data-sel="' + idx + '"' + (x.burst.selected ? ' checked' : '') + '></td>' +
+      '<td>' + (top ? '<span class="badge">#' + (i + 1) + '</span>' : '<span class="nd">#' + (i + 1) + '</span> ') + esc(x.burst.name || '(unnamed)') + '</td>' +
+      '<td class="num"><strong>' + g(p.prob.gain85) + ' d</strong><div class="nd">' + g(p.pess.gain85) + ' to ' + g(p.opt.gain85) + '</div></td>' +
+      '<td class="num">' + d(p.prob.lt) + ' d</td><td class="num">' + pc(p.prob.fe) + '</td>' +
+      '<td>' + gapBar(p, need, base85) + '</td></tr>';
+  }).join('');
+  var combo = '';
+  if (r.combo) {
+    var c = r.combo.prob, hit = r.target && hasP85 ? (c.p85 <= r.target ? '<span class="ok">reaches the target</span>' : '<span class="ko">' + d(c.p85 - r.target) + ' d above the target</span>') : '';
+    var safe = r.target && hasP85 && r.combo.pess.p85 <= r.target ? ' Even the pessimistic case reaches it.' : '';
+    combo = '<div class="combo"><strong>Future state</strong> (' + r.comboCount + ' burst' + (r.comboCount > 1 ? 's' : '') + '): VSM lead time ' + d(n.lt) + ' → ' + d(c.lt) + ' d, flow efficiency ' + pc(n.fe) + ' → ' + pc(c.fe) +
+      (hasP85 ? ', P85 <strong>' + d(r.real.p85) + ' → ' + d(c.p85) + ' d</strong> (range ' + d(r.combo.opt.p85) + '–' + d(r.combo.pess.p85) + ' d)' + (isNaN(r.real.p50) ? '' : ', median ' + d(r.real.p50) + ' → ' + d(c.p50) + ' d') : '') + '. ' + hit + (hit ? '.' : '') + safe +
+      gapBar(r.combo, need, base85) +
+      (r.comboCount > 1 ? '<span style="color:var(--on-ink-muted)">Combined gain ' + g(c.gain85) + ' d vs ' + g(r.comboSum) + ' d if you add the individual gains' + (c.gain85 < r.comboSum - 0.05 ? ': bursts on the same boxes overlap.' : '.') + '</span>' : '') + '</div>';
+  }
+  var nd = r.notDemo.length ? '<p class="hint" style="margin-top:12px"><strong>Impact not demonstrable</strong> (no box changed, or no probable value): ' + r.notDemo.map(function (x) { return esc(x.burst.name || '(unnamed)'); }).join(', ') + '. Put them on the map, or drop them.</p>' : '';
+  $('results').innerHTML = (rows ? '<div class="scroll"><table><thead><tr><th>Future state</th><th>Kaizen burst</th><th class="num">' + (hasP85 ? 'P85 gain' : 'Lead time gain') + '</th><th class="num">New VSM LT</th><th class="num">Flow eff.</th><th>' + (need ? 'Gap to target closed' : 'Reduction') + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="hint">No kaizen burst with a demonstrable impact yet.</p>') + combo + nd;
+}
+var timer;
+function schedule() { clearTimeout(timer); timer = setTimeout(renderResults, 120); }
+function renderAll() { renderBanner(); renderInputs(); renderResults(); }
+function clearAll() { state = { throughput: '', real: { p50: '', p85: '', target: '' }, steps: [], bursts: [] }; save(); renderAll(); }
+
+function init() {
+  state = load();
+  renderAll();
+  document.addEventListener('input', function (ev) {
+    var t = ev.target, ds = t.dataset, v = t.type === 'number' ? (t.value === '' ? '' : num(t.value)) : t.value;
+    if (ds.real) state.real[ds.real] = v;
+    else if (ds.top) state.throughput = v;
+    else if (ds.s !== undefined) state.steps[+ds.s][ds.f] = v;
+    else if (ds.c !== undefined && ds.f === 'box') { var p = v.split('|'); state.bursts[+ds.b].changes[+ds.c].step = p[0]; state.bursts[+ds.b].changes[+ds.c].field = p[1] || ''; }
+    else if (ds.c !== undefined) state.bursts[+ds.b].changes[+ds.c][ds.f] = v;
+    else if (ds.b !== undefined) state.bursts[+ds.b][ds.f] = v;
+    else if (ds.sel !== undefined) state.bursts[+ds.sel].selected = t.checked;
+    else return;
+    touched();
+  });
+  // Step names and inventory feed other widgets: refresh them once editing of the field is done.
+  document.addEventListener('change', function (ev) { var ds = ev.target.dataset; if (ds.s !== undefined && (ds.f === 'name' || ds.f === 'inv')) renderInputs(); });
+  document.addEventListener('click', function (ev) {
+    var ds = ev.target.dataset; if (!ds) return;
+    if (ds.toggle) { $(ds.toggle).classList.toggle('open'); return; }
+    if (ds.delStep !== undefined) { var id = state.steps[+ds.delStep].id; state.steps.splice(+ds.delStep, 1); state.bursts.forEach(function (b) { b.changes = b.changes.filter(function (c) { return c.step !== id; }); }); }
+    else if (ds.up !== undefined || ds.down !== undefined) { var from = +(ds.up !== undefined ? ds.up : ds.down), to = from + (ds.up !== undefined ? -1 : 1); state.steps.splice(to, 0, state.steps.splice(from, 1)[0]); }
+    else if (ds.delBurst !== undefined) state.bursts.splice(+ds.delBurst, 1);
+    else if (ds.delChange !== undefined) { var q = ds.delChange.split(':'); state.bursts[+q[0]].changes.splice(+q[1], 1); }
+    else if (ds.addChange !== undefined) state.bursts[+ds.addChange].changes.push({ step: '', field: '', pess: '', prob: '', opt: '' });
+    else return;
+    renderInputs(); touched();
+  });
+  document.addEventListener('change', function (ev) { if (ev.target.dataset.f === 'box') renderInputs(); });
+  $('add-step').onclick = function () { state.steps.push({ id: uid(), name: '', pt: '', inv: '', wait: '' }); renderInputs(); touched(); };
+  $('add-burst').onclick = function () { state.bursts.push({ id: uid(), name: '', selected: false, changes: [{ step: '', field: '', pess: '', prob: '', opt: '' }] }); renderInputs(); touched(); };
+  $('apply-steps').onclick = function () {
+    var s = parseSteps(document.querySelector('#paste-steps textarea').value);
+    if (!s.length) { $('paste-steps-msg').textContent = 'No valid line found. Expected: Step ⇥ Process time ⇥ Inventory.'; return; }
+    var ids = {}; state.steps.forEach(function (o) { ids[o.name.toLowerCase()] = o.id; });
+    s.forEach(function (o) { if (ids[o.name.toLowerCase()]) o.id = ids[o.name.toLowerCase()]; }); // keep bursts linked to same-name steps
+    state.steps = s; $('paste-steps-msg').textContent = s.length + ' steps loaded.'; renderInputs(); touched();
+  };
+  $('export').onclick = function () {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
+    a.download = 'future-state-vsm-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+  };
+  $('import').onclick = function () { $('import-file').click(); };
+  $('import-file').onchange = function () {
+    var f = this.files[0]; if (!f) return;
+    f.text().then(function (t) {
+      try { var s = JSON.parse(t); if (!s.steps || !s.bursts || !s.real) throw 0; state = s; save(); renderAll(); }
+      catch (e) { alert('This file is not an export of this tool.'); }
+    });
+    this.value = '';
+  };
+  $('example').onclick = function () { if (state.example || confirm('Replace your data with the example?')) { state = example(); save(); renderAll(); } };
+  $('clear').onclick = function () { if (confirm('Delete all steps and bursts? Export first if you want to keep them.')) clearAll(); };
+}
+if (typeof document !== 'undefined') init();
+</script>
+</body>
+</html>
