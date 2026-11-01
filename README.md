@@ -7,7 +7,12 @@ Part of the Collaboration Solved flow toolkit. It sits at the start of the chain
 cost an impediment ([impediment-value-calculator](https://github.com/pcdenant/impediment-value-calculator)) →
 prove the result ([Continuous-Improvement-Calculator](https://github.com/pcdenant/Continuous-Improvement-Calculator)).
 
-## Use
+Two versions are in this repo, to test side by side:
+
+- `index.html` — **distribution-based prioritizer**: median and P85 per stage, Monte Carlo simulation.
+- `vsm.html` — **future-state VSM calculator**: process time and inventory per step, the classic Lean future-state map, with the P85 projected on top.
+
+## Use (`index.html`)
 
 Open `index.html` in a browser. No build, no server. Data stays in the browser (localStorage), with JSON export/import.
 
@@ -23,10 +28,18 @@ Open `index.html` in a browser. No build, no server. Data stays in the browser (
 - The model assumes stages are independent, which underestimates the tail. To correct for this, the gain is computed as a % of the simulated P85 and applied to the real P85.
 - "Where does the time go" compares a typical item (P40–P60 of the simulated total) with a tail item (≥ P85).
 
+## Future-state VSM calculator (`vsm.html`)
+
+1. **Current state.** Throughput (items/week), real median and P85, target P85. Per step: process time (days of real work) and inventory (items). Wait = inventory ÷ throughput (Little's law); a wait can be entered directly when there is no inventory count. Shows VSM lead time, flow efficiency and a work/wait timeline per step.
+2. **Kaizen bursts.** Each burst changes boxes on the map (a step's process time, inventory or wait, or the stream throughput) to a future value: pessimistic / probable / optimistic. The tool shows the % change and its effect.
+3. **Future state.** Bursts are ranked by P85 gain (probable). Ticked bursts build the future-state map: VSM lead time, flow efficiency and P85, before and after.
+
+Model: lead time = Σ process time + Σ wait. Two bursts on the same box multiply. The P85 and median are scaled by the lead-time ratio (future ÷ current), which assumes the tail shrinks in proportion: optimistic when the tail is driven by blocked items.
+
 ## Tests
 
 ```
-node --test tests/calc.test.js
+node --test tests/calc.test.js tests/vsm.test.js
 ```
 
 Out of scope for v1: cost of delay, effort, CSV/Jira import, link with the Continuous-Improvement-Calculator, French UI, WIP effects in the paste format.
