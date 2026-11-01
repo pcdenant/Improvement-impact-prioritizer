@@ -14,9 +14,13 @@
      impediment-value-calculator and Continuous-Improvement-Calculator. */
   :root{
     --ink:#15110d; --paper:#f9f3e4; --paper-strong:#f0e5cb;
-    --signal:#c8102e; --signal-on-ink:#e63946; --ok:#1e6b3a;
-    --text:#1a1a1a; --muted:#666; --on-ink-muted:rgba(255,255,255,.8);
-    --border:#e8ddd1; --track:#8c8073; --bar:#5b5048;
+    --signal:#c8102e; --signal-on-ink:#e63946;
+    --status-gain:#3fae74; --status-gain-on-paper:#1e6b3a; /* on ink / on paper */
+    --status-loss:#e75248; --status-loss-on-paper:#c81e1e;
+    --status-warn:#b45309; /* on paper */
+    --white:#fff; --paper-light:#fffdf7;
+    --text:#1a1a1a; --muted:#666; --on-ink-muted:rgba(255,255,255,.8); --on-ink-border:rgba(249,243,228,.2);
+    --border:#e8ddd1; --bar:#5b5048;
     --radius:20px; --radius-sm:10px; --gap:12px;
     --f:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,sans-serif;
     --f-heading:'Archivo',-apple-system,BlinkMacSystemFont,sans-serif;
@@ -37,22 +41,24 @@
   th{text-align:left;font-weight:600;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;padding:6px 6px;border-bottom:1px solid var(--border)}
   td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
   td.num,th.num{text-align:right;font-family:var(--f-mono)}
-  input,select,textarea{font:inherit;color:var(--text);background:#fff;border:1px solid var(--border);border-radius:6px;padding:6px 8px;width:100%}
+  input:not([type=checkbox]),select{min-height:48px}
+  input,select,textarea{font:inherit;color:var(--text);background:var(--white);border:1px solid var(--border);border-radius:6px;padding:6px 8px;width:100%}
   input[type=number]{font-family:var(--f-mono);text-align:right;min-width:70px}
-  input[type=checkbox]{width:18px;height:18px;accent-color:var(--signal)}
-  input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+  input[type=checkbox]{width:22px;height:22px;accent-color:var(--signal)}
+  label.hit{display:inline-flex;align-items:center;justify-content:center;min-width:48px;min-height:48px;cursor:pointer}
+  :focus-visible{outline:2px solid var(--paper);outline-offset:2px;box-shadow:0 0 0 4px var(--signal)}
   textarea{font-family:var(--f-mono);font-size:.8rem;min-height:110px}
-  button{font:inherit;font-weight:600;font-size:.875rem;border:1px solid var(--ink);background:var(--paper);color:var(--ink);border-radius:var(--radius-sm);padding:7px 12px;cursor:pointer}
+  button{min-height:48px;font:inherit;font-weight:600;font-size:.875rem;border:1px solid var(--ink);background:var(--paper);color:var(--ink);border-radius:var(--radius-sm);padding:7px 12px;cursor:pointer}
   button.primary{background:var(--ink);color:var(--paper)}
-  button.icon{border:none;background:none;color:var(--muted);padding:4px 8px;font-size:1rem}
+  button.icon{border:none;background:none;color:var(--muted);min-width:48px;padding:0;font-size:1.1rem}
   button.icon:hover{color:var(--signal)}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
   .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .grid3 label{font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;flex-direction:column;gap:4px}
-  .warn{color:var(--signal);font-size:.8rem}
+  .warn{color:var(--status-warn);font-size:.8rem}
   .paste{display:none;margin-top:10px}
   .paste.open{display:block}
-  .action{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:#fffdf7}
+  .action{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--paper-light)}
   .action-head{display:flex;gap:8px;align-items:center}
   .action-head input[type=text]{font-weight:600}
   .banner{background:var(--paper-strong);border-radius:var(--radius-sm);padding:8px 12px;font-size:.85rem;margin-bottom:12px}
@@ -68,24 +74,24 @@
   .gapbar{position:relative;height:14px;background:var(--border);border-radius:4px;min-width:140px}
   .gapbar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--bar);border-radius:4px}
   .gapbar .range{position:absolute;top:6px;height:2px;background:var(--ink)}
-  .gapbar.done .fill{background:var(--ok)}
+  .gapbar.done .fill{background:var(--status-gain-on-paper)}
   tr.top3 .gapbar:not(.done) .fill{background:var(--signal)}
   .gaplabel{font-size:.8rem;margin-top:3px;white-space:nowrap}
-  .combo .gapbar{background:rgba(249,243,228,.2);margin:8px 0 4px}
+  .combo .gapbar{background:var(--on-ink-border);margin:8px 0 4px}
   .combo .gapbar .fill{background:var(--paper)}
-  .combo .gapbar.done .fill{background:#8fd19e}
+  .combo .gapbar.done .fill{background:var(--status-gain)}
   .combo .gapbar .range{background:var(--signal-on-ink)}
   .kpi .s{font-size:.75rem;color:var(--on-ink-muted);margin-top:4px;font-family:var(--f-mono)}
-  .kpi .s.ko{color:var(--signal-on-ink)}
+  .kpi .s.ko{color:var(--status-loss)}
   .conv{font-size:.75rem;color:var(--muted);font-family:var(--f-mono)}
   .conv .warn{font-family:var(--f)}
   .moves{white-space:nowrap}
-  .badge{display:inline-block;font-family:var(--f-mono);font-size:.7rem;font-weight:700;background:var(--signal);color:#fff;border-radius:4px;padding:1px 6px;margin-right:6px}
+  .badge{display:inline-block;font-family:var(--f-mono);font-size:.7rem;font-weight:700;background:var(--signal);color:var(--white);border-radius:4px;padding:1px 6px;margin-right:6px}
   .nd{color:var(--muted);font-style:italic}
   .combo{background:var(--ink);color:var(--paper);border-radius:var(--radius-sm);padding:14px;margin-top:14px}
   .combo strong{font-family:var(--f-mono)}
-  .combo .ok{color:#8fd19e}
-  .combo .ko{color:var(--signal-on-ink)}
+  .combo .ok{color:var(--status-gain)}
+  .combo .ko{color:var(--status-loss)}
   .legend{font-size:.8rem;color:var(--muted);margin-top:8px}
   .legend i{display:inline-block;width:10px;height:10px;vertical-align:middle;margin:0 4px 0 10px;border-radius:2px}
   footer{color:var(--on-ink-muted);font-size:.8rem;text-align:center;padding:8px 0 24px}
@@ -122,7 +128,7 @@
       <button type="button" data-toggle="paste-stages">Paste from Excel / Confluence</button>
     </div>
     <div class="paste" id="paste-stages">
-      <p class="hint">One stage per line: <code>Stage ⇥ Median ⇥ P85 ⇥ Source (optional)</code>. Copy the cells and paste. Replaces the current stages.</p>
+      <p class="hint">One stage per line: <code>Stage ⇥ Median ⇥ P85 ⇥ Source (optional) ⇥ Avg WIP (optional)</code>. Copy the cells and paste. Replaces the current stages.</p>
       <textarea aria-label="Paste stages"></textarea>
       <div class="row"><button type="button" class="primary" id="apply-stages">Replace stages</button><span class="warn" id="paste-stages-msg"></span></div>
     </div>
@@ -286,8 +292,19 @@ function parseRows(text) {
   return String(text || '').split(/\r?\n/).map(function (l) { return l.trim() ? l.split(l.indexOf('\t') >= 0 ? '\t' : ';').map(function (c) { return c.trim(); }) : null; }).filter(Boolean);
 }
 function parseStages(text) {
+  // Columns after P85: a number is the average WIP, text is the source; either order, both optional.
   return parseRows(text).filter(function (r) { return r[0] && !isNaN(num(r[1])); }).map(function (r) {
-    return { id: uid(), name: r[0], median: num(r[1]), p85: num(r[2]), source: /estim/i.test(r[3] || '') ? 'estimate' : 'measured' };
+    var extra = r.slice(3), wip = extra.map(num).find(function (x) { return !isNaN(x); });
+    var src = extra.find(function (c) { return c && isNaN(num(c)); }) || '';
+    return { id: uid(), name: r[0], median: num(r[1]), p85: num(r[2]), wip: wip === undefined ? '' : wip, source: /estim/i.test(src) ? 'estimate' : 'measured' };
+  });
+}
+// Pasted stages replace the old ones; a same-name stage keeps its id (action links) and its WIP if the paste has none.
+function mergeStages(old, pasted) {
+  return pasted.map(function (p) {
+    var o = old.find(function (x) { return String(x.name).toLowerCase() === p.name.toLowerCase(); });
+    if (!o) return p;
+    return Object.assign({}, p, { id: o.id, wip: p.wip === '' ? (o.wip === undefined ? '' : o.wip) : p.wip });
   });
 }
 function parseActions(text, stages) {
@@ -332,15 +349,21 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function d(x) { return isFinite(x) ? (Math.abs(x) >= 10 ? Math.round(x) : Math.round(x * 10) / 10) : '–'; }
 function g(x) { return x >= 0 ? '−' + d(x) : '+' + d(-x); } // days removed from P85 (negative gain = slower)
 function $(id) { return document.getElementById(id); }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private mode: still works, just not saved */ } }
+var storageNote = ''; // shown in the banner when the browser storage fails
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch (e) { if (!storageNote) { storageNote = 'This browser does not keep your data (private mode?). Use Export JSON to save it.'; renderBanner(); } }
+}
 function load() {
-  try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && s.stages && s.actions && s.real) return s; } catch (e) { }
+  try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && s.stages && s.actions && s.real) return s; }
+  catch (e) { storageNote = 'Your saved data could not be read, so the example is shown. Import your last JSON export to restore it.'; }
   return example();
 }
 function touched() { if (state.example) { state.example = false; renderBanner(); } save(); refreshConv(); schedule(); }
 
 function renderBanner() {
-  $('banner').innerHTML = state.example ? '<div class="banner">Fictional example data. Replace it with yours, or <button type="button" id="start-empty">start empty</button></div>' : '';
+  $('banner').innerHTML = (storageNote ? '<div class="banner warn" role="status">' + esc(storageNote) + '</div>' : '') +
+    (state.example ? '<div class="banner">Fictional example data. Replace it with yours, or <button type="button" id="start-empty">start empty</button></div>' : '');
   if (state.example) $('start-empty').onclick = clearAll;
 }
 function renderInputs() {
@@ -434,7 +457,7 @@ function renderResults() {
   var rows = r.ranked.map(function (x, i) {
     var p = x.proj, top = i < 3 && p.prob.gain85 > 0;
     var idx = state.actions.indexOf(x.action);
-    return '<tr' + (top ? ' class="top3"' : '') + '><td><input type="checkbox" aria-label="Include in combination" data-sel="' + idx + '"' + (x.action.selected ? ' checked' : '') + '></td>' +
+    return '<tr' + (top ? ' class="top3"' : '') + '><td><label class="hit"><input type="checkbox" aria-label="Include in combination" data-sel="' + idx + '"' + (x.action.selected ? ' checked' : '') + '></label></td>' +
       '<td>' + (top ? '<span class="badge">#' + (i + 1) + '</span>' : '<span class="nd">#' + (i + 1) + '</span> ') + esc(x.action.name || '(unnamed)') + '</td>' +
       '<td class="num"><strong>' + g(p.prob.gain85) + ' d</strong><div class="nd">' + g(p.pess.gain85) + ' to ' + g(p.opt.gain85) + '</div></td>' +
       '<td class="num">' + d(p.prob.p85) + ' d</td><td class="num">' + d(p.prob.p50) + ' d</td>' +
@@ -491,9 +514,7 @@ function init() {
   $('apply-stages').onclick = function () {
     var s = parseStages(document.querySelector('#paste-stages textarea').value);
     if (!s.length) { $('paste-stages-msg').textContent = 'No valid line found. Expected: Stage ⇥ Median ⇥ P85.'; return; }
-    var ids = {}; state.stages.forEach(function (o) { ids[o.name.toLowerCase()] = o.id; });
-    s.forEach(function (o) { if (ids[o.name.toLowerCase()]) o.id = ids[o.name.toLowerCase()]; }); // keep action links on same-name stages
-    state.stages = s; $('paste-stages-msg').textContent = s.length + ' stages loaded.'; renderInputs(); touched();
+    state.stages = mergeStages(state.stages, s); $('paste-stages-msg').textContent = s.length + ' stages loaded.'; renderInputs(); touched();
   };
   $('apply-actions').onclick = function () {
     var res = parseActions(document.querySelector('#paste-actions textarea').value, state.stages);
