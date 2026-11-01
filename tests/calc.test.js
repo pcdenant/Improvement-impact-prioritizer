@@ -128,3 +128,15 @@ test('two stages: simulated P50/P85 match an independent reference within 3 %', 
   // 50 % cut on stage a: reference P85 27.82, i.e. -40.8 % applied to the real 200 d.
   near(r.ranked[0].proj.prob.p85, 200 * 27.82 / 46.97, 200 * 0.03, 'projected real p85');
 });
+
+test('pasting stages keeps their WIP: read from the paste, else kept from the same-name stage', () => {
+  const pasted = ctx.parseStages('Analysis\t12\t60\tMeasured\t40\nQA\t5\t15\t8\nDev\t8\t20');
+  assert.equal(pasted[0].wip, 40, 'WIP after the source column');
+  assert.equal(pasted[1].wip, 8, 'WIP without a source column');
+  assert.equal(pasted[1].source, 'measured');
+  const old = [{ id: 'd1', name: 'dev', median: 7, p85: 18, wip: 12 }];
+  const merged = ctx.mergeStages(old, pasted);
+  assert.equal(merged[2].id, 'd1', 'same-name stage keeps its id (action links)');
+  assert.equal(merged[2].wip, 12, 'WIP kept when the paste has none');
+  assert.equal(merged[2].median, 8, 'pasted values win');
+});
