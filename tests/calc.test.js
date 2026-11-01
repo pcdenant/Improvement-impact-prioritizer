@@ -117,3 +117,14 @@ test('WIP effect on a stage without WIP is not demonstrable', () => {
   assert.equal(r.ranked.length, 0);
   assert.equal(r.notDemo.length, 1);
 });
+
+// Reference values computed outside the tool (numpy, 4M draws, same log-normal fit).
+test('two stages: simulated P50/P85 match an independent reference within 3 %', () => {
+  const s = { real: { p85: 200 }, stages: [{ id: 'a', median: 10, p85: 40 }, { id: 'b', median: 5, p85: 10 }],
+    actions: [{ id: 'x', effects: [{ stage: 'a', pess: 50, prob: 50, opt: 50, share: 100 }] }] };
+  const r = ctx.evaluate(s);
+  near(r.base.p50, 16.94, 16.94 * 0.03, 'p50');
+  near(r.base.p85, 46.97, 46.97 * 0.03, 'p85');
+  // 50 % cut on stage a: reference P85 27.82, i.e. -40.8 % applied to the real 200 d.
+  near(r.ranked[0].proj.prob.p85, 200 * 27.82 / 46.97, 200 * 0.03, 'projected real p85');
+});

@@ -71,3 +71,17 @@ test('paste steps and example data', () => {
   assert.equal(r.notDemo.length, 1);
   assert.ok(r.combo.prob.p85 < r.real.p85);
 });
+
+// Worked example done by hand on the example data (see PR): 62 items / 1 per day = 62 d wait,
+// 13.5 d process, LT 75.5 d, FE 17.9 %; burst "WIP limit" 25 -> 9 gives LT 59.5 d, P85 170 x 59.5 / 75.5 = 134.0 d.
+test('example data matches the hand-computed future-state map', () => {
+  const r = ctx.evaluate(ctx.example());
+  near(r.now.wt, 62, 1e-9, 'total wait');
+  near(r.now.pt, 13.5, 1e-9, 'total process');
+  near(r.now.lt, 75.5, 1e-9, 'VSM lead time');
+  near(r.now.fe, 0.1788, 0.0005, 'flow efficiency');
+  const b1 = r.ranked.find(x => x.burst.id === 'b1').proj.prob;
+  near(b1.lt, 59.5, 1e-9, 'future LT');
+  near(b1.p85, 133.97, 0.01, 'projected P85');
+  near(b1.gain85, 36.03, 0.01, 'P85 gain');
+});

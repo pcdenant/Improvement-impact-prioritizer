@@ -119,9 +119,9 @@
       <label>Real P85 lead time (days)<input type="number" step="any" min="0" data-real="p85"></label>
       <label>Target P85 (days)<input type="number" step="any" min="0" data-real="target"></label>
     </div>
-    <h3 class="hint" style="margin-top:16px">Steps. Process time = days of real work on one item. Inventory = items waiting in or before the step. Wait = inventory ÷ throughput (Little's law); enter the wait directly only if you have no inventory count.</h3>
+    <h3 class="hint" style="margin-top:16px">Steps. All times are in calendar days, like your lead time. Process time = calendar days of real work on one item. Inventory = items waiting in or before the step. Wait = inventory ÷ throughput (Little's law); enter the wait directly only if you have no inventory count.</h3>
     <div class="scroll"><table>
-      <thead><tr><th></th><th>Step</th><th class="num">Process time (d)</th><th class="num">Inventory (items)</th><th class="num">Wait (d)</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Step</th><th class="num">Process time (calendar d)</th><th class="num">Inventory (items)</th><th class="num">Wait (d)</th><th></th></tr></thead>
       <tbody id="steps"></tbody>
     </table></div>
     <div class="row">
